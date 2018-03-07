@@ -10,7 +10,7 @@ class NeuralNetworkTrainer
 {
 
 public:
-	NeuralNetworkTrainer() = delete;
+	NeuralNetworkTrainer() = default;
 	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter);
 
 public:
@@ -26,10 +26,10 @@ public:
 	std::pair<int, double> gradientDescent(const NeuralNetwork& network, 
 		const Eigen::VectorXd& input, const Eigen::VectorXd& output);
 
-	void setLambda(double lambda);
-	void setAlpha(double alpha);
-	void setTolerance(double tol);
-	void setMaxIter(double maxIter);
+	NeuralNetworkTrainer& setLambda(double lambda);
+	NeuralNetworkTrainer& setAlpha(double alpha);
+	NeuralNetworkTrainer& setTolerance(double tol);
+	NeuralNetworkTrainer& setMaxIter(double maxIter);
 
 private:
 	double lambda_ = 0;
