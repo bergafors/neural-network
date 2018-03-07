@@ -6,22 +6,32 @@
 
 #include <vector>
 
-
 class NeuralNetwork
 {
-	friend NeuralNetworkTrainer;
+public:
+	friend class NeuralNetworkTrainer;
+
+	using Matrix = Eigen::MatrixXd;
+	using Vector = Eigen::VectorXd;
+	using SizeType = Matrix::Index;
+
+	// The commented functions below are to be implemented.
 
 public:
-	NeuralNetwork() = default;
-	NeuralNetwork(std::vector<Eigen::MatrixXd::Index> layerSizes);
+	NeuralNetwork() = delete;
+	//NeuralNetwork(MatrixSize inputLayerSize, MatrixSize outputLayerSize);
+	NeuralNetwork(std::vector<SizeType> layerSizes);
 
 public:
-	Eigen::VectorXd forwardPropagate(const Eigen::VectorXd& input);
 
-	void addLayer(Eigen::MatrixXd::Index layerSize);
-	Eigen::MatrixXd::Index getLayerSize(std::size_t index);
+	//Eigen::VectorXd forwardPropagate(const Eigen::VectorXd& input);
+
+	/*Iterator insertLayer(Iterator pos);
+	Iterator removeLayer(Iterator pos);
+	void changeLayerSize(MatrixSize pos, const MatrixSize layerSize);
+	MatrixSize getLayerSize(Iterator pos);*/
 
 private:
-	std::vector<Eigen::MatrixXd> weights_;
-	std::vector<Eigen::MatrixXd::Index> layerSizes_;
+	std::vector<Matrix> weights_;
+	std::vector<SizeType> layers_;
 };
