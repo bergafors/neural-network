@@ -12,7 +12,6 @@ public:
 	friend class NeuralNetworkTrainer;
 
 	using Matrix = Eigen::MatrixXd;
-	using Vector = Eigen::VectorXd;
 	using SizeType = Matrix::Index;
 
 	// The commented functions below are to be implemented.
@@ -24,7 +23,7 @@ public:
 
 public:
 
-	//Eigen::VectorXd forwardPropagate(const Eigen::VectorXd& input);
+	Matrix forwardPropagate(const Matrix& input);
 
 	/*Iterator insertLayer(Iterator pos);
 	Iterator removeLayer(Iterator pos);

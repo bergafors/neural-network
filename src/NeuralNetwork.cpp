@@ -14,8 +14,26 @@ NeuralNetwork::NeuralNetwork(std::vector<SizeType> layers)
 		}
 	}
 	else {
-		throw std::logic_error("Size of layerSizes has to be >= 2.");
+		throw std::logic_error("Number of layers has to be >= 2.");
 	}
+}
+
+NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input)
+{
+	static auto sigmoidFunction = [](double x) {return 1 / (1 + std::exp(-x)); };
+
+	// The unit activation of the input layer is just the input
+	auto activation = input;
+	for (const auto& m : weights_) {
+		// Add bias unit to the activation
+		activation.conservativeResize(activation.rows() + 1, Eigen::NoChange);
+		activation.row(activation.rows() - 1).setOnes();
+
+		// Calculate the unit activation in the next layer
+		activation = (m*activation).unaryExpr(sigmoidFunction);
+	}
+
+	return activation;
 }
 
 /*NeuralNetwork::Iterator NeuralNetwork::insertLayer(Iterator pos, const MatrixSize layerSize)
