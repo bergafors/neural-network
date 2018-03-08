@@ -19,11 +19,16 @@ public:
 public:
 	NeuralNetwork() = delete;
 	//NeuralNetwork(MatrixSize inputLayerSize, MatrixSize outputLayerSize);
-	NeuralNetwork(std::vector<SizeType> layerSizes);
+	NeuralNetwork(const std::vector<SizeType>& layers);
+	NeuralNetwork(const std::vector<Matrix>& weights);
+
 
 public:
 
 	Matrix forwardPropagate(const Matrix& input);
+
+	const std::vector<Matrix>& getWeights();
+	const std::vector<SizeType>& getLayers();
 
 	/*Iterator insertLayer(Iterator pos);
 	Iterator removeLayer(Iterator pos);

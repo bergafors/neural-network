@@ -2,7 +2,7 @@
 #include <iterator>
 
 
-NeuralNetwork::NeuralNetwork(std::vector<SizeType> layers)
+NeuralNetwork::NeuralNetwork(const std::vector<SizeType>& layers)
 	: layers_(layers)
 {
 	// Add 1 to the column size to account for the bias unit
@@ -15,6 +15,15 @@ NeuralNetwork::NeuralNetwork(std::vector<SizeType> layers)
 	}
 	else {
 		throw std::logic_error("Number of layers has to be >= 2.");
+	}
+}
+
+NeuralNetwork::NeuralNetwork(const std::vector<Matrix>& weights)
+	: weights_(weights)
+{
+	layers_.push_back(weights_.front().cols() - 1);
+	for (const auto& w : weights_) {
+		layers_.push_back(w.rows());
 	}
 }
 
@@ -34,6 +43,15 @@ NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input)
 	}
 
 	return activation;
+}
+
+const std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights()
+{
+	return weights_;
+}
+const std::vector<NeuralNetwork::SizeType>& NeuralNetwork::getLayers()
+{
+	return layers_;
 }
 
 /*NeuralNetwork::Iterator NeuralNetwork::insertLayer(Iterator pos, const MatrixSize layerSize)
