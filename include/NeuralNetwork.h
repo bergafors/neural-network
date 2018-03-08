@@ -1,7 +1,5 @@
 #pragma once
 
-#include "NeuralNetworkTrainer.h"
-
 #include <Eigen/Dense>
 
 #include <vector>
@@ -25,10 +23,10 @@ public:
 
 public:
 
-	Matrix forwardPropagate(const Matrix& input);
+	Matrix forwardPropagate(const Matrix& input) const;
 
-	const std::vector<Matrix>& getWeights();
-	const std::vector<SizeType>& getLayers();
+	const std::vector<Matrix>& getWeights() const;
+	const std::vector<SizeType>& getLayers() const;
 
 	/*Iterator insertLayer(Iterator pos);
 	Iterator removeLayer(Iterator pos);

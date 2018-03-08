@@ -1,6 +1,4 @@
 #include "NeuralNetwork.h"
-#include <iterator>
-
 
 NeuralNetwork::NeuralNetwork(const std::vector<SizeType>& layers)
 	: layers_(layers)
@@ -27,7 +25,7 @@ NeuralNetwork::NeuralNetwork(const std::vector<Matrix>& weights)
 	}
 }
 
-NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input)
+NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input) const
 {
 	static auto sigmoidFunction = [](double x) {return 1 / (1 + std::exp(-x)); };
 
@@ -45,11 +43,11 @@ NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input)
 	return activation;
 }
 
-const std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights()
+const std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights() const
 {
 	return weights_;
 }
-const std::vector<NeuralNetwork::SizeType>& NeuralNetwork::getLayers()
+const std::vector<NeuralNetwork::SizeType>& NeuralNetwork::getLayers() const
 {
 	return layers_;
 }

@@ -18,7 +18,7 @@ TEST_CASE("NeuralNetwork basic functionalities")
 TEST_CASE("Forward propagation")
 {
 	// Emulate an XNOR-gate using a neural network
-	// Input: [a; b]. Output: z 
+	// Signature: [bool; bool] -> bool
 
 	// Emulate a AND b (first row) and a NOR b (second row)
 	NeuralNetwork::Matrix w1(2, 3);

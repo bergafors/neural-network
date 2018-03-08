@@ -13,14 +13,14 @@ class NeuralNetworkTrainer
 
 public:
 	NeuralNetworkTrainer() = default;
-	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter);
-
+	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept;
+	
 public:
 	// void trainNeuralNetwork(NeuralNetwork& network, 
 	//	const Eigen::VectorXd& input, const Eigen::VectorXd& output);
 
-	// double costFunction(const NeuralNetwork& network, 
-	//	const Eigen::VectorXd& input, const Eigen::VectorXd& output);
+	double costFunction(const NeuralNetwork& network, 
+		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output) const;
 
 	// std::vector<Eigen::MatrixXd> backwardPropagate(const NeuralNetwork& network, 
 	//	const Eigen::VectorXd& input);
