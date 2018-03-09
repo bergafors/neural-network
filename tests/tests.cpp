@@ -59,16 +59,16 @@ TEST_CASE("Forward propagation II")
 	NeuralNetwork::Matrix w2(1, 3);
 	w2 << 20, 20, -10;
 
-	NeuralNetwork nn({w1, w2});
+	NeuralNetwork nn({ w1, w2 });
 
 	// Create a truth table for XNOR
 	NeuralNetwork::Matrix input(2, 4);
-	NeuralNetwork::Matrix correctOutput(1, 4);
+	NeuralNetwork::Matrix outputExact(1, 4);
 	input << 0, 0, 1, 1, 0, 1, 0, 1;
-	correctOutput << 1, 0, 0, 1;
+	outputExact << 1, 0, 0, 1;
 
 	auto output = nn.forwardPropagate(input);
-	auto mean = (output - correctOutput).cwiseAbs().mean();
+	auto mean = (output - outputExact).cwiseAbs().mean();
 
 	REQUIRE(std::abs(mean) < TOL);
 }

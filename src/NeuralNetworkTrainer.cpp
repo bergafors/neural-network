@@ -34,6 +34,63 @@ double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
 	return costLog + costReg;
 }
 
+std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const NeuralNetwork& network,
+	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output)
+{
+	const auto NCOLS = input.cols(); // Number of training examples
+
+	auto activations = forwardPropagateAll(network, input);
+
+	// Add bias unit to each layer activation
+	for (auto& a : activations) {
+		a.conservativeResize(a.rows() + 1, Eigen::NoChange);
+		a.row(a.rows() - 1).setOnes();
+	}
+
+	// Partial derivates of the cost function
+	std::vector<Eigen::MatrixXd> pdCost(network.getWeights().size()); 
+
+	Eigen::MatrixXd delta = activations.back() - output; // End layer error term
+	for (std::size_t i = pdCost.size() - 1; i >= 0; --i) {
+		const auto& a = activations[i];
+		const auto& w = network.weights_[i];
+
+		pdCost[i] = delta * a.transpose() / NCOLS;
+		if (i > 0)
+			pdCost[i] = pdCost[i] + lambda_ * w / NCOLS;
+
+		// Calculate the error term for the next layer
+		delta = w.transpose() * delta;
+		delta = delta.cwiseProduct(a);
+		delta = delta.cwiseProduct(Eigen::MatrixXd::Ones(a.rows(), a.cols()) - a);
+	}
+
+	return pdCost;
+}
+
+std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::forwardPropagateAll(const NeuralNetwork& network,
+	const Eigen::MatrixXd& input)
+{
+	static auto sigmoidFunction = [](double x) {return 1 / (1 + std::exp(-x)); };
+
+	// The unit activation of the input layer is just the input
+	std::vector<Eigen::MatrixXd> activations{ input };
+	for (const auto& w : network.weights_) {
+		auto a = activations.back();
+
+		// Add bias unit to the activation
+		a.conservativeResize(a.rows() + 1, Eigen::NoChange);
+		a.row(a.rows() - 1).setOnes();
+
+		// Calculate the unit activation in the next layer
+		a = (w*a).unaryExpr(sigmoidFunction);
+
+		activations.push_back(std::move(a));
+	}
+
+	return activations;
+}
+
 NeuralNetworkTrainer& NeuralNetworkTrainer::setLambda(double lambda)
 {
 	lambda_ = lambda;
