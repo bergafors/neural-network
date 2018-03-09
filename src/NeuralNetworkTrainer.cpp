@@ -11,18 +11,20 @@ double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
 	const auto NROWS = output.rows(); // Output size
 	const auto NCOLS = output.cols(); // Number of training examples
 	
-	const auto outputApprox = network.forwardPropagate(input);
-
-	// Cost attributed to logistic regression
+	// Cost attributed to logistic regression								  
 	double costLog = 0;
 
-	const auto ones = NeuralNetwork::Matrix::Ones(NROWS, NCOLS);
-	auto temp = output.cwiseProduct(outputApprox) + (ones - output).cwiseProduct(ones - outputApprox);
-	
-	costLog = -temp.sum() / NCOLS;
+	{
+		const auto outputApprox = network.forwardPropagate(input);
 
+		const auto ones = NeuralNetwork::Matrix::Ones(NROWS, NCOLS);
+		auto temp = output.cwiseProduct(outputApprox) + (ones - output).cwiseProduct(ones - outputApprox);
+
+		costLog = -temp.sum() / NCOLS;
+	}
+	
 	// Cost attributed to regularization of weight matrices
-	// This counter-acts overfitting
+	// This helps counter-act overfitting
 	double costReg = 0; 
 	for (const auto& w : network.weights_) {
 		costReg += w.cwiseAbs2().sum();
