@@ -1,4 +1,6 @@
 #include "NeuralNetworkTrainer.h"
+
+#include <algorithm>
 #include <iostream>
 
 NeuralNetworkTrainer::NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept
@@ -49,8 +51,7 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 	const auto sz = network.getWeights().size();
 
 	// Partial derivates of the cost function
-	std::vector<Eigen::MatrixXd> pdCost;
-	pdCost.reserve(sz);
+	std::vector<Eigen::MatrixXd> pdCost(sz);
 
 	const auto NCOLS = input.cols(); // Number of training examples
 	Eigen::MatrixXd delta = activations.back() - output; // End layer error term
@@ -59,12 +60,13 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 		const auto& a = activations[ri];
 		const auto& w = network.getWeights()[ri];
 
-		pdCost.push_back(delta * a.transpose() / NCOLS);
-		if (i < sz - 1) 
-			pdCost.back() += lambda_ * w;
-
-		if (i > 0) 
+		// Remove the bias unit portion of the error term. The end term has none
+		if (i > 0)
 			delta.conservativeResize(delta.rows() - 1, Eigen::NoChange);
+
+		pdCost[ri] = delta * a.transpose() / NCOLS;
+		if (i < sz - 1) 
+			pdCost[ri] += lambda_ * w;
 
 		// Calculate the error term for the next layer
 		delta = w.transpose() * delta; 
@@ -96,4 +98,50 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::forwardPropagateAll(const Neu
 	}
 
 	return activations;
+}
+
+std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& network,
+	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output)
+{
+	std::vector<Eigen::MatrixXd> prevWeights;
+	prevWeights.reserve(network.getWeights().size());
+
+	int i = 0;
+	double stepSize = 2 * tol_; // Initial value to ensure tol_ < stepSize for the first iteration
+	for (; tol_ < stepSize && i < maxIter_; ++i) {
+		auto& weights = network.weights_;
+		prevWeights = weights;
+
+		{
+			const auto jacobian = backwardPropagate(network, input, output);
+			auto ita = weights.begin();
+			auto itb = jacobian.begin();
+			while (ita != weights.end() && itb != jacobian.end()) {
+				*ita = *ita - alpha_ * *itb;
+				++ita;
+				++itb;
+			}
+		}
+
+		{
+			std::vector<Eigen::MatrixXd> stepDiff;
+			stepDiff.reserve(weights.size());
+			auto ita = weights.begin();
+			auto itb = prevWeights.begin();
+			while (ita != weights.end() && itb != prevWeights.end()) {
+				stepDiff.push_back((*ita - *itb).cwiseAbs());
+				++ita;
+				++itb;
+			}
+
+			auto it = std::max_element(stepDiff.begin(), stepDiff.end(), 
+				[](const auto& m1, const auto& m2) {
+				return m1.maxCoeff() < m1.maxCoeff();
+			});
+
+			stepSize = it->maxCoeff();
+		}
+	}
+
+	return { i, stepSize };
 }

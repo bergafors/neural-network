@@ -26,7 +26,7 @@ public:
 	double costFunction(const NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output) const;
 
-	// Return the partial derivates of the cost function w.r.t to the weight matrices
+	// Return the jacobian of the cost function w.r.t to the weight matrices
 	// in %network, calculated given %input and %output
 	std::vector<Eigen::MatrixXd> backwardPropagate(const NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
@@ -35,7 +35,7 @@ public:
 	std::vector<Eigen::MatrixXd> forwardPropagateAll(const NeuralNetwork& network,
 		const Eigen::MatrixXd& input);
 
-	//std::pair<int, double> gradientDescent(const NeuralNetwork& network, 
-	//	const Eigen::VectorXd& input, const Eigen::VectorXd& output);
+	std::pair<int, double> gradientDescent(NeuralNetwork& network, 
+		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
 
 };

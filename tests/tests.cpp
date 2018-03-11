@@ -7,6 +7,7 @@
 #include "NeuralNetworkTrainer.h"
 
 #include <vector>
+#include <iterator>
 
 #define TOL 1e-4 // The tolerence for various measures used in the tests
 
@@ -129,7 +130,8 @@ TEST_CASE("Cost function I")
 
 TEST_CASE("Backward propagation I")
 {
-	// Basic test to check if backprop throws an error
+	// Check that backprop returns matrices of the same
+	// dimensions as the network weight matrices
 
 	NeuralNetwork::Matrix w1(2, 3);
 	NeuralNetwork::Matrix w2(1, 3);
@@ -143,4 +145,45 @@ TEST_CASE("Backward propagation I")
 	NeuralNetworkTrainer nnt;
 
 	REQUIRE_NOTHROW(nnt.backwardPropagate(nn, input, output));
+
+	const auto jacobian = nnt.backwardPropagate(nn, input, output);
+
+	auto sameDim = [](const auto& mveca, const auto& mvecb) {
+		auto ita = mveca.begin();
+		auto itb = mvecb.begin();
+		bool same = true;
+		while (ita != mveca.end() && itb != mvecb.end()) {
+			if (ita->rows() != itb->rows() || ita->cols() != itb->cols()) {
+				std::cout << "Jacobian and weight matrix number " 
+					<< std::distance(mveca.begin(), ita) << " differ.\n";
+				std::cout << "Jacobian dim: " << "(" << ita->rows() << ", " << ita->cols() << ")\n";
+				std::cout << "Weight matrix dim: " << "(" << itb->rows() << ", " << itb->cols() << ")\n";
+
+				same = false;
+			}
+
+			++ita;
+			++itb;
+		}
+
+		return same;
+	};
+
+	REQUIRE(sameDim(jacobian, nn.getWeights()));
+}
+
+TEST_CASE("Gradient descent")
+{
+	NeuralNetwork::Matrix w1(2, 3);
+	NeuralNetwork::Matrix w2(1, 3);
+	NeuralNetwork nn({ w1.setRandom(), w2.setRandom() });
+
+	NeuralNetwork::Matrix input(2, 4);
+	NeuralNetwork::Matrix output(1, 4);
+	input << 0, 0, 1, 1, 0, 1, 0, 1;
+	output << 1, 0, 0, 1;
+
+	NeuralNetworkTrainer nnt(0, 1, 1, 50);
+	
+	REQUIRE_NOTHROW(nnt.gradientDescent(nn, input, output));
 }
