@@ -7,7 +7,7 @@
 class NeuralNetwork
 {
 public:
-	friend class NeuralNetworkTrainer;
+	friend struct NeuralNetworkTrainer;
 
 	using Matrix = Eigen::MatrixXd;
 	using SizeType = Matrix::Index;
@@ -22,11 +22,10 @@ public:
 
 
 public:
-
 	Matrix forwardPropagate(const Matrix& input) const;
 
-	const std::vector<Matrix>& getWeights() const;
-	const std::vector<SizeType>& getLayers() const;
+	const std::vector<Matrix>& getWeights() const noexcept;
+	const std::vector<SizeType>& getLayers() const noexcept;
 
 	/*Iterator insertLayer(Iterator pos);
 	Iterator removeLayer(Iterator pos);

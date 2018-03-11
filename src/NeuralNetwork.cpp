@@ -27,7 +27,7 @@ NeuralNetwork::NeuralNetwork(const std::vector<Matrix>& weights)
 
 NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input) const
 {
-	static auto sigmoidFunction = [](double x) {return 1 / (1 + std::exp(-x)); };
+	static auto sigmoidFunction = [](double x) noexcept {return 1 / (1 + std::exp(-x)); };
 
 	// The unit activation of the input layer is just the input
 	auto activation = input;
@@ -43,11 +43,11 @@ NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input) const
 	return activation;
 }
 
-const std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights() const
+const std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights() const noexcept
 {
 	return weights_;
 }
-const std::vector<NeuralNetwork::SizeType>& NeuralNetwork::getLayers() const
+const std::vector<NeuralNetwork::SizeType>& NeuralNetwork::getLayers() const noexcept
 {
 	return layers_;
 }

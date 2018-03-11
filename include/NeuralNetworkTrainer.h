@@ -6,8 +6,12 @@
 
 #include <vector>
 
-class NeuralNetworkTrainer
+struct NeuralNetworkTrainer
 {
+	double lambda_ = 0;
+	double alpha_ = 0;
+	double tol_ = 0;
+	int maxIter_ = 0;
 
 	// The commented functions below are to be implemented.
 
@@ -31,17 +35,7 @@ public:
 	std::vector<Eigen::MatrixXd> forwardPropagateAll(const NeuralNetwork& network,
 		const Eigen::MatrixXd& input);
 
-	// std::pair<int, double> gradientDescent(const NeuralNetwork& network, 
+	//std::pair<int, double> gradientDescent(const NeuralNetwork& network, 
 	//	const Eigen::VectorXd& input, const Eigen::VectorXd& output);
 
-	NeuralNetworkTrainer& setLambda(double lambda);
-	NeuralNetworkTrainer& setAlpha(double alpha);
-	NeuralNetworkTrainer& setTolerance(double tol);
-	NeuralNetworkTrainer& setMaxIter(int maxIter);
-
-private:
-	double lambda_ = 0;
-	double alpha_ = 0;
-	double tol_ = 0;
-	int maxIter_ = 0;
 };

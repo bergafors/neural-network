@@ -126,3 +126,21 @@ TEST_CASE("Cost function I")
 
 	REQUIRE(isMin);
 }
+
+TEST_CASE("Backward propagation I")
+{
+	// Basic test to check if backprop throws an error
+
+	NeuralNetwork::Matrix w1(2, 3);
+	NeuralNetwork::Matrix w2(1, 3);
+	NeuralNetwork nn({ w1, w2 });
+
+	NeuralNetwork::Matrix input(2, 4);
+	NeuralNetwork::Matrix output(1, 4);
+	input << 0, 0, 1, 1, 0, 1, 0, 1;
+	output << 1, 0, 0, 1;
+
+	NeuralNetworkTrainer nnt;
+
+	REQUIRE_NOTHROW(nnt.backwardPropagate(nn, input, output));
+}
