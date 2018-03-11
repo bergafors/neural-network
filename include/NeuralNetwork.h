@@ -24,6 +24,7 @@ public:
 public:
 	Matrix forwardPropagate(const Matrix& input) const;
 
+	std::vector<Matrix>& getWeights() noexcept;
 	const std::vector<Matrix>& getWeights() const noexcept;
 	const std::vector<SizeType>& getLayers() const noexcept;
 

@@ -17,11 +17,13 @@ double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
 	// Cost attributed to logistic regression								  
 	double costLog = 0;
 
+	static auto cwiseLog = [](double x) noexcept {return std::log(x); };
 	{
 		const auto outputApprox = network.forwardPropagate(input);
-
 		const auto ones = NeuralNetwork::Matrix::Ones(NROWS, NCOLS);
-		const auto temp = output.cwiseProduct(outputApprox) + (ones - output).cwiseProduct(ones - outputApprox);
+
+		Eigen::MatrixXd temp = output.cwiseProduct(outputApprox.unaryExpr(cwiseLog));
+		temp += (ones - output).cwiseProduct((ones - outputApprox).unaryExpr(cwiseLog));
 
 		costLog = -temp.sum() / NCOLS;
 	}
@@ -50,23 +52,24 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 
 	const auto sz = network.getWeights().size();
 
-	// Partial derivates of the cost function
-	std::vector<Eigen::MatrixXd> pdCost(sz);
+	// Jacobian of the cost function w.r.t each weight matrix
+	std::vector<Eigen::MatrixXd> jacobian(sz);
 
+	// Calculate the jacobian for each weight matrix, starting from the last.
 	const auto NCOLS = input.cols(); // Number of training examples
 	Eigen::MatrixXd delta = activations.back() - output; // End layer error term
 	for (std::size_t i = 0; i < sz; ++i) {
 		const auto ri = sz - 1 - i;
 		const auto& a = activations[ri];
-		const auto& w = network.getWeights()[ri];
+		const auto& w = network.weights_[ri];
 
 		// Remove the bias unit portion of the error term. The end term has none
-		if (i > 0)
+		if (i > 0) {
 			delta.conservativeResize(delta.rows() - 1, Eigen::NoChange);
+		}
 
-		pdCost[ri] = delta * a.transpose() / NCOLS;
-		if (i < sz - 1) 
-			pdCost[ri] += lambda_ * w;
+		jacobian[ri] = delta * a.transpose() / NCOLS;
+		jacobian[ri].block(0, 0, w.rows(), w.cols() - 1) += lambda_ * w.block(0, 0, w.rows(), w.cols() - 1);
 
 		// Calculate the error term for the next layer
 		delta = w.transpose() * delta; 
@@ -74,7 +77,7 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 		delta = delta.cwiseProduct(Eigen::MatrixXd::Ones(a.rows(), a.cols()) - a);
 	}
 
-	return pdCost;
+	return jacobian;
 }
 
 std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::forwardPropagateAll(const NeuralNetwork& network,
@@ -104,7 +107,7 @@ std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& netw
 	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output)
 {
 	std::vector<Eigen::MatrixXd> prevWeights;
-	prevWeights.reserve(network.getWeights().size());
+	prevWeights.reserve(network.weights_.size());
 
 	int i = 0;
 	double stepSize = 2 * tol_; // Initial value to ensure tol_ < stepSize for the first iteration

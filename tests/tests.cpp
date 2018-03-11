@@ -172,6 +172,58 @@ TEST_CASE("Backward propagation I")
 	REQUIRE(sameDim(jacobian, nn.getWeights()));
 }
 
+TEST_CASE("Backward propagation II")
+{
+	// Check that the values returned by back prop agree with 
+	// the values computed using the Newton quotient
+
+	NeuralNetwork::Matrix w1(2, 3);
+	NeuralNetwork::Matrix w2(1, 3);
+	NeuralNetwork nn({ w1.setRandom(), w2.setRandom() });
+
+	NeuralNetwork::Matrix input(2, 4);
+	NeuralNetwork::Matrix output(1, 4);
+	input << 0, 0, 1, 1, 0, 1, 0, 1;
+	output << 1, 0, 0, 1;
+
+	NeuralNetworkTrainer nnt;
+
+	auto jacobian = nnt.backwardPropagate(nn, input, output);
+
+	const double EPS = 1e-4;
+	std::vector<Eigen::MatrixXd> newtonQuot;
+	auto nnMinus = nn;
+	auto nnPlus = nn;
+	for (std::size_t k = 0; k < nn.getWeights().size(); ++k) {
+		const auto& w = nn.getWeights()[k];
+		Eigen::MatrixXd nq(w.rows(), w.cols());
+		for (int j = 0; j < w.cols(); ++j) {
+			for (int i = 0; i < w.rows(); ++i) {
+				nnMinus.getWeights()[k](i, j) -= EPS;
+				nnPlus.getWeights()[k](i, j) += EPS;
+				nq(i, j) = (nnt.costFunction(nnPlus, input, output) - nnt.costFunction(nnMinus, input, output)) / (2 * EPS);
+				nnMinus.getWeights()[k](i, j) += EPS;
+				nnPlus.getWeights()[k](i, j) -= EPS;
+			}
+		}
+		newtonQuot.push_back(std::move(nq));
+	}
+
+	auto agrees = [](const auto& mveca, const auto& mvecb) {
+		for (std::size_t k = 0; k < mveca.size(); ++k) {
+			const auto maxRelErr = (mveca[k] - mvecb[k]).cwiseQuotient(mveca[k]).cwiseAbs().maxCoeff();
+			if ( maxRelErr > TOL) {
+				std::cout << "A maximum relative error of " << maxRelErr << " was detected.\n";
+				std::cout << "This exceeds the tolerance level of " << TOL << '\n';
+				return false;
+			}
+		}
+		return true;
+	};
+
+	REQUIRE(agrees(jacobian, newtonQuot));
+}
+
 TEST_CASE("Gradient descent")
 {
 	NeuralNetwork::Matrix w1(2, 3);

@@ -43,6 +43,11 @@ NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input) const
 	return activation;
 }
 
+std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights() noexcept
+{
+	return weights_;
+}
+
 const std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights() const noexcept
 {
 	return weights_;
