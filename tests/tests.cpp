@@ -239,3 +239,36 @@ TEST_CASE("Gradient descent")
 	
 	REQUIRE_NOTHROW(nnt.gradientDescent(nn, input, output));
 }
+
+TEST_CASE("Gradient descent II")
+{
+	NeuralNetwork::Matrix w1(2, 3);
+	w1 << 20, 20, -30, -20, -20, 10;
+
+	NeuralNetwork::Matrix w2(1, 3);
+	w2 << 20, 20, -10;
+
+	NeuralNetwork nn({ w1, w2});
+
+	NeuralNetwork::Matrix input(2, 4);
+	NeuralNetwork::Matrix output(1, 4);
+	input << 0, 0, 1, 1, 0, 1, 0, 1;
+	output << 1, 0, 0, 1;
+
+	NeuralNetworkTrainer nnt(0, 1e-2, TOL/1000, 1000);
+
+	auto p = nnt.gradientDescent(nn, input, output);
+	std::cout << p.first << " " << p.second;
+	
+	REQUIRE(nnt.costFunction(nn, input, output) < TOL*10);
+}
+
+TEST_CASE("Normalize features")
+{
+	Eigen::MatrixXd someMat(10, 8);
+	someMat.setRandom();
+
+	NeuralNetworkTrainer nnt;
+
+	REQUIRE_NOTHROW(nnt.normalizeFeatures(someMat));
+}

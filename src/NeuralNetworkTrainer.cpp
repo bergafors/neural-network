@@ -2,10 +2,21 @@
 
 #include <algorithm>
 #include <iostream>
+#include <cassert>
 
 NeuralNetworkTrainer::NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept
 	: lambda_(lambda), alpha_(alpha), tol_(tol), maxIter_(maxIter)
 {
+}
+
+void NeuralNetworkTrainer::trainNeuralNetwork(NeuralNetwork& network,
+	Eigen::MatrixXd input, Eigen::MatrixXd output)
+{
+	normalizeFeatures(input);
+	for (auto& w : network.weights_) {
+		w.setRandom();
+	}
+	const auto p = gradientDescent(network, input, output);
 }
 
 double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
@@ -16,11 +27,11 @@ double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
 	
 	// Cost attributed to logistic regression								  
 	double costLog = 0;
-
-	static auto cwiseLog = [](double x) noexcept {return std::log(x); };
 	{
 		const auto outputApprox = network.forwardPropagate(input);
+
 		const auto ones = NeuralNetwork::Matrix::Ones(NROWS, NCOLS);
+		static auto cwiseLog = [](double x) noexcept {return std::log(x); };
 
 		Eigen::MatrixXd temp = output.cwiseProduct(outputApprox.unaryExpr(cwiseLog));
 		temp += (ones - output).cwiseProduct((ones - outputApprox).unaryExpr(cwiseLog));
@@ -147,4 +158,21 @@ std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& netw
 	}
 
 	return { i, stepSize };
+}
+
+void NeuralNetworkTrainer::normalizeFeatures(Eigen::MatrixXd& features)
+{
+	const auto NCOLS = features.cols();
+	assert(NCOLS > 1 && "Cannot calculate standard deviation of one element vectors");
+
+	for (int i = 0; i < features.rows(); ++i) {
+		const double mean = features.row(i).sum() / NCOLS;
+		const Eigen::RowVectorXd meanVec = mean * Eigen::RowVectorXd::Ones(NCOLS);
+
+		const double stdDev = (features.row(i) - meanVec).norm() / (NCOLS - 1);
+
+		features.row(i) = (features.row(i) - meanVec) / stdDev;
+	}
+
+	return;
 }

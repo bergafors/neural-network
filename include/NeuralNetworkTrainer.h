@@ -20,8 +20,8 @@ public:
 	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept;
 	
 public:
-	// void trainNeuralNetwork(NeuralNetwork& network, 
-	//	const Eigen::VectorXd& input, const Eigen::VectorXd& output);
+	 void trainNeuralNetwork(NeuralNetwork& network, 
+		Eigen::MatrixXd input, Eigen::MatrixXd output);
 
 	double costFunction(const NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output) const;
@@ -31,11 +31,13 @@ public:
 	std::vector<Eigen::MatrixXd> backwardPropagate(const NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
 
-	// Return the unit activations of each network layer. Including the bias unit
+	// Return the unit activations of each network layer.
 	std::vector<Eigen::MatrixXd> forwardPropagateAll(const NeuralNetwork& network,
 		const Eigen::MatrixXd& input);
 
 	std::pair<int, double> gradientDescent(NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
+
+	void normalizeFeatures(Eigen::MatrixXd& features);
 
 };
