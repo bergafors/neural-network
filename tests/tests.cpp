@@ -6,6 +6,9 @@
 #include "NeuralNetwork.h"
 #include "NeuralNetworkTrainer.h"
 
+#include <fstream>
+#include <string>
+
 #include <vector>
 #include <iterator>
 
@@ -258,7 +261,7 @@ TEST_CASE("Gradient descent II")
 	NeuralNetworkTrainer nnt(0, 1e-2, TOL/1000, 1000);
 
 	auto p = nnt.gradientDescent(nn, input, output);
-	std::cout << p.first << " " << p.second;
+	//std::cout << p.first << " " << p.second;
 	
 	REQUIRE(nnt.costFunction(nn, input, output) < TOL*10);
 }
@@ -271,4 +274,38 @@ TEST_CASE("Normalize features")
 	NeuralNetworkTrainer nnt;
 
 	REQUIRE_NOTHROW(nnt.normalizeFeatures(someMat));
+}
+
+TEST_CASE("Large training set")
+{
+	std::ifstream trainData("../testdata/train-images.idx3-ubyte", std::ios::binary);
+	if (!trainData) {
+		std::cout << "Couldnt open data file";
+	}
+
+	long nread = 0;
+	try {
+		trainData.exceptions(std::ifstream::badbit | std::ifstream::failbit);
+		std::int32_t mgn = 0;
+		trainData.read((char*) &mgn, 4);
+		std::cout << std::hex << mgn << std::dec << std::endl;
+		unsigned char pixel;
+		trainData.ignore(12);
+		int i = 0;
+		while (true) {
+			if (i == (28 * 28)) {
+				++nread;
+				if (nread % 1000 == 0)
+					std::cout << nread << std::endl;
+				i = 0;
+			}
+			trainData.read((char*)&pixel, sizeof(pixel));
+			++i;
+		}
+	}
+	catch (std::ifstream::failure&) {
+		std::cout << "Error reading file\n";
+	}
+
+	std::cout << nread << std::endl;
 }
