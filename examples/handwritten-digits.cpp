@@ -20,38 +20,62 @@ double calculateAccuracy(const NeuralNetwork& nn, const Eigen::MatrixXd& input,
 
 int main()
 {
-	const std::int32_t maxTrainItems = 10;
-	const std::int32_t maxTestItems = 2;
+	const std::int32_t maxTrainItems = 50;
+	const std::int32_t maxTestItems = 10;
 
-	std::ifstream trainInputFile("../testdata/train-images.idx3-ubyte", std::ios::binary);
-	if (!trainInputFile) {
-		std::cout << "Couldnt open data file";
+	Eigen::MatrixXd trainInput, trainOutput, testInput, testOutput;
+
+	{
+		std::ifstream file("../testdata/train-images.idx3-ubyte", std::ios::binary);
+		if (!file) {
+			std::cout << "Couldnt open data file";
+		}
+		trainInput = readData(file, DataType::Images, maxTrainItems);
+		std::cout << '\r' << "Training input data read.\n";
 	}
-	Eigen::MatrixXd trainInput = readData(trainInputFile, DataType::Images, maxTrainItems);
-
-	std::ifstream trainOutputFile("../testdata/train-labels.idx1-ubyte", std::ios::binary);
-	if (!trainOutputFile) {
-		std::cout << "Couldnt open data file";
+	
+	{
+		std::ifstream file("../testdata/train-labels.idx1-ubyte", std::ios::binary);
+		if (!file) {
+			std::cout << "Couldnt open data file";
+		}
+		trainOutput = readData(file, DataType::Labels, maxTrainItems);
+		std::cout << '\r' << "Training output data read.\n";
 	}
-	Eigen::MatrixXd trainOutput = readData(trainOutputFile, DataType::Labels, maxTrainItems);
 
-	std::ifstream testInputFile("../testdata/t10k-images.idx3-ubyte", std::ios::binary);
-	if (!testInputFile) {
-		std::cout << "Couldnt open data file";
+	{
+		std::ifstream file("../testdata/t10k-images.idx3-ubyte", std::ios::binary);
+		if (!file) {
+			std::cout << "Couldnt open data file";
+		}
+		testInput = readData(file, DataType::Images, maxTestItems);
+		std::cout << '\r' << "Test input data read.\n";
 	}
-	Eigen::MatrixXd testInput = readData(testInputFile, DataType::Images, maxTestItems);
 
-	std::ifstream testOutputFile("../testdata/t10k-labels.idx1-ubyte", std::ios::binary);
-	if (!testOutputFile) {
-		std::cout << "Couldnt open data file";
+	{
+		std::ifstream file("../testdata/t10k-labels.idx1-ubyte", std::ios::binary);
+		if (!file) {
+			std::cout << "Couldnt open data file";
+		}
+		testOutput = readData(file, DataType::Labels, maxTestItems);
+		std::cout << '\r' << "Test output data read.\n";
 	}
-	Eigen::MatrixXd testOutput = readData(testOutputFile, DataType::Labels, maxTestItems);
 
-	NeuralNetwork nn({28*28, 28*28, 10});
-	NeuralNetworkTrainer nnt(0, 1e-2, 1e-5, 50);
-	nnt.trainNeuralNetwork(nn, trainInput, trainOutput);
+	NeuralNetwork nn({28*28, 28*28, 28*28, 28*28, 10});
+	NeuralNetworkTrainer nnt(10, 1e-6, 1e-3, 10);
 
-	double accurary = calculateAccuracy(nn, testInput, testOutput);
+	std::cout << "Training neural network...";
+	const auto p = nnt.trainNeuralNetwork(nn, trainInput, trainOutput);
+	std::cout << "\nTraining complete.\n";
+	std::cout << "Steps taken: " << p.first << '\n';
+	std::cout << "Final cost function difference: " << p.second << '\n';
+
+	std::cout << "Calculating accurary...";
+	Eigen::MatrixXd normTestInput = testInput;
+	nnt.normalizeFeatures(normTestInput);
+	double accurary = calculateAccuracy(nn, normTestInput, testOutput);
+
+	std::cout << "\nThe neural network correctly identified " << accurary << "% of the hand-written digits.\n";
 
 	return 0;
 }
@@ -96,14 +120,9 @@ Eigen::MatrixXd readData(std::ifstream& file, const DataType dt, const std::int3
 		// Read as big-endian. Intel processors use little-endian
 		magicNum = _byteswap_ulong(magicNum); 
 
-		std::cout << std::hex << magicNum << std::dec << std::endl;
-
 		std::int32_t nitems = 0;
 		file.read((char*)&nitems, sizeof(nitems));
 		nitems = _byteswap_ulong(nitems);
-
-		std::cout << nitems << std::endl;
-
 
 		std::int32_t nrows = 0, ncols = 0;
 		if (dt == DataType::Images) {
@@ -111,21 +130,19 @@ Eigen::MatrixXd readData(std::ifstream& file, const DataType dt, const std::int3
 			file.read((char*)&ncols, sizeof(ncols));
 			nrows = _byteswap_ulong(nrows);
 			ncols = _byteswap_ulong(ncols);
-			std::cout << nrows << std::endl;
-			std::cout << ncols << std::endl;
-
 		}
 		else /*if (dt == DataType::Labels) */ {
 			nrows = 10;
 			ncols = 1;
 		}
-		data.resize(nrows*ncols, nitems);
-		data.setZero();
 
 		if (maxItems > 0 && nitems > maxItems) {
 			nitems = maxItems;
 		}
 		
+		data.resize(nrows*ncols, nitems);
+		data.setZero();
+
 		unsigned char element;
 		for (int k = 0; k < nitems; ++k) {
 			for (int i = 0; i < nrows; ++i) {
@@ -140,12 +157,10 @@ Eigen::MatrixXd readData(std::ifstream& file, const DataType dt, const std::int3
 					}
 				}
 			}
-			int divisor = nitems / 100;
-			if (divisor > 0 && (k + 1) % (nitems / 100) == 0) {
+			if (nitems < 100 || (k + 1) % (nitems / 100) == 0) {
 				std::cout << '\r' << ((k + 1)*100) / nitems << "% of items read." << std::flush;
 			}
 		}
-		std::cout << std::endl;
 	}
 	catch (std::ifstream::failure&) {
 		std::cout << "Error reading file\n";

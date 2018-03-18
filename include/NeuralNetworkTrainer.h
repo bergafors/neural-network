@@ -20,7 +20,7 @@ public:
 	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept;
 	
 public:
-	 void trainNeuralNetwork(NeuralNetwork& network, 
+	 std::pair<int, double> trainNeuralNetwork(NeuralNetwork& network, 
 		Eigen::MatrixXd input, Eigen::MatrixXd output);
 
 	double costFunction(const NeuralNetwork& network, 

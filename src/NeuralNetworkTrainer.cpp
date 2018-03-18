@@ -9,14 +9,14 @@ NeuralNetworkTrainer::NeuralNetworkTrainer(double lambda, double alpha, double t
 {
 }
 
-void NeuralNetworkTrainer::trainNeuralNetwork(NeuralNetwork& network,
+std::pair<int, double> NeuralNetworkTrainer::trainNeuralNetwork(NeuralNetwork& network,
 	Eigen::MatrixXd input, Eigen::MatrixXd output)
 {
 	normalizeFeatures(input);
 	for (auto& w : network.weights_) {
-		w.setRandom();
+		0.01*w.setRandom();
 	}
-	const auto p = gradientDescent(network, input, output);
+	return gradientDescent(network, input, output);
 }
 
 double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
@@ -117,47 +117,29 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::forwardPropagateAll(const Neu
 std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& network,
 	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output)
 {
-	std::vector<Eigen::MatrixXd> prevWeights;
-	prevWeights.reserve(network.weights_.size());
-
 	int i = 0;
-	double stepSize = 2 * tol_; // Initial value to ensure tol_ < stepSize for the first iteration
-	for (; tol_ < stepSize && i < maxIter_; ++i) {
-		auto& weights = network.weights_;
-		prevWeights = weights;
+	double prevCost = costFunction(network, input, output);
+	std::cout << prevCost << std::endl;
+	double costDiff = 2 * tol_; // Initial value to ensure tol_ < stepSize for the first iteration
+	for (; tol_ < costDiff && i < maxIter_; ++i) {
 
 		{
 			const auto jacobian = backwardPropagate(network, input, output);
-			auto ita = weights.begin();
+			auto ita = network.weights_.begin();
 			auto itb = jacobian.begin();
-			while (ita != weights.end() && itb != jacobian.end()) {
+			while (ita != network.weights_.end() && itb != jacobian.end()) {
 				*ita = *ita - alpha_ * *itb;
 				++ita;
 				++itb;
 			}
 		}
 
-		{
-			std::vector<Eigen::MatrixXd> stepDiff;
-			stepDiff.reserve(weights.size());
-			auto ita = weights.begin();
-			auto itb = prevWeights.begin();
-			while (ita != weights.end() && itb != prevWeights.end()) {
-				stepDiff.push_back((*ita - *itb).cwiseAbs());
-				++ita;
-				++itb;
-			}
-
-			auto it = std::max_element(stepDiff.begin(), stepDiff.end(), 
-				[](const auto& m1, const auto& m2) {
-				return m1.maxCoeff() < m1.maxCoeff();
-			});
-
-			stepSize = it->maxCoeff();
-		}
+		double cost = costFunction(network, input, output);
+		costDiff = std::abs(cost - prevCost);
+		prevCost = cost;
 	}
 
-	return { i, stepSize };
+	return { i, costDiff };
 }
 
 void NeuralNetworkTrainer::normalizeFeatures(Eigen::MatrixXd& features)
@@ -169,10 +151,12 @@ void NeuralNetworkTrainer::normalizeFeatures(Eigen::MatrixXd& features)
 		const double mean = features.row(i).sum() / NCOLS;
 		const Eigen::RowVectorXd meanVec = mean * Eigen::RowVectorXd::Ones(NCOLS);
 
-		const double stdDev = (features.row(i) - meanVec).norm() / (NCOLS - 1);
+		double stdDev = (features.row(i) - meanVec).norm() / std::sqrt((NCOLS - 1));
+		
+		if (stdDev == 0) {
+			stdDev = 1;
+		}
 
 		features.row(i) = (features.row(i) - meanVec) / stdDev;
 	}
-
-	return;
 }
