@@ -20,7 +20,7 @@ double calculateAccuracy(const NeuralNetwork& nn, const Eigen::MatrixXd& input,
 
 int main()
 {
-	const std::int32_t maxTrainItems = 50;
+	const std::int32_t maxTrainItems = 10;
 	const std::int32_t maxTestItems = 10;
 
 	Eigen::MatrixXd trainInput, trainOutput, testInput, testOutput;
@@ -61,21 +61,51 @@ int main()
 		std::cout << '\r' << "Test output data read.\n";
 	}
 
-	NeuralNetwork nn({28*28, 28*28, 28*28, 28*28, 10});
-	NeuralNetworkTrainer nnt(10, 1e-6, 1e-3, 10);
+	/*std::cout << "Training output:\n";
+	for (int i = 0; i < trainOutput.rows(); ++i) {
+		std::cout << "Num " << i << ": " << trainOutput.row(i).mean() << std::endl;;
+	}
 
-	std::cout << "Training neural network...";
+	std::cout << "Test output:\n";
+	for (int i = 0; i < testOutput.rows(); ++i) {
+		std::cout << "Num " << i << ": " << testOutput.row(i).mean() << std::endl;
+	}*/
+
+	NeuralNetwork nn({28*28, 100, 10});
+	for (auto& w : nn.getWeights()) {
+		1e-2*w.setRandom();
+	}
+
+	NeuralNetworkTrainer nnt(0, 1e-2, 1e-5, 1600);
+
+	std::cout << "Normalizing training and test input features...\n";
+	/*const auto normMat = nnt.normalizeFeatures(trainInput);
+	std::cout << "Normalization complete.\n";
+	if (trainInput.hasNaN()) {
+		std::cout << "Error: normalized training input contains NaN values\n";
+	}
+	if (!trainInput.allFinite()) {
+		std::cout << "Error: normalized training input contains Inf values\n";
+	}
+
+	Eigen::MatrixXd normTestInput = (testInput - normMat.first).cwiseQuotient(normMat.second);
+	if (normTestInput.hasNaN()) {
+		std::cout << "Error: normalized test input contains NaN values\n";
+	}
+	if (!normTestInput.allFinite()) {
+		std::cout << "Error: normalized test input contains Inf values\n";
+	}*/
+
+	std::cout << "Training neural network...\n";
 	const auto p = nnt.trainNeuralNetwork(nn, trainInput, trainOutput);
-	std::cout << "\nTraining complete.\n";
+	std::cout << "Training complete.\n";
 	std::cout << "Steps taken: " << p.first << '\n';
 	std::cout << "Final cost function difference: " << p.second << '\n';
 
-	std::cout << "Calculating accurary...";
-	Eigen::MatrixXd normTestInput = testInput;
-	nnt.normalizeFeatures(normTestInput);
-	double accurary = calculateAccuracy(nn, normTestInput, testOutput);
+	std::cout << "Calculating accuracy...\n";
+	double accuracy = calculateAccuracy(nn, trainInput, trainOutput);
 
-	std::cout << "\nThe neural network correctly identified " << accurary << "% of the hand-written digits.\n";
+	std::cout << "The neural network correctly identified " << 100*accuracy << "% of the hand-written digits.\n";
 
 	return 0;
 }
@@ -84,28 +114,20 @@ double calculateAccuracy(const NeuralNetwork& nn, const Eigen::MatrixXd& input,
 	const Eigen::MatrixXd& correctOutput)
 {
 	const Eigen::MatrixXd output = nn.forwardPropagate(input);
-	std::vector<int> maxByIndex;
-	maxByIndex.reserve(output.cols());
-	for (int j = 0; j < output.cols(); ++j) {
-		int maxIndex = 0;
-		double maxCoeff = output(0, j);
-		for (int i = 1; i < output.rows(); ++i) {
-			if (output(i, j) > maxCoeff) {
-				maxIndex = i;
-				maxCoeff = output(i, j);
-			}
-		}
-		maxByIndex.push_back(maxIndex);
-	}
 
 	double accuracy = 0;
-	for (int j = 0; j < correctOutput.cols(); ++j) {
-		if (correctOutput(maxByIndex[j], j) == 1) {
+	Eigen::MatrixXd::Index indexOfMax = 0;
+	Eigen::MatrixXd::Index correctIndexOfMax = 0;
+	for (int i = 0; i < output.cols(); ++i) {
+		output.col(i).maxCoeff(&indexOfMax);
+		correctOutput.col(i).maxCoeff(&correctIndexOfMax);
+
+		if (indexOfMax == correctIndexOfMax) {
 			++accuracy;
 		}
 	}
-	
-	return accuracy / correctOutput.cols();
+
+	return accuracy / output.cols();
 }
 
 Eigen::MatrixXd readData(std::ifstream& file, const DataType dt, const std::int32_t maxItems)

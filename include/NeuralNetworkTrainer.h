@@ -38,6 +38,6 @@ public:
 	std::pair<int, double> gradientDescent(NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
 
-	void normalizeFeatures(Eigen::MatrixXd& features);
+	std::pair<Eigen::MatrixXd, Eigen::MatrixXd> normalizeFeatures(Eigen::MatrixXd& features);
 
 };

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cassert>
+#include <limits>
 
 NeuralNetworkTrainer::NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept
 	: lambda_(lambda), alpha_(alpha), tol_(tol), maxIter_(maxIter)
@@ -12,10 +13,6 @@ NeuralNetworkTrainer::NeuralNetworkTrainer(double lambda, double alpha, double t
 std::pair<int, double> NeuralNetworkTrainer::trainNeuralNetwork(NeuralNetwork& network,
 	Eigen::MatrixXd input, Eigen::MatrixXd output)
 {
-	normalizeFeatures(input);
-	for (auto& w : network.weights_) {
-		0.01*w.setRandom();
-	}
 	return gradientDescent(network, input, output);
 }
 
@@ -30,22 +27,43 @@ double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
 	{
 		const auto outputApprox = network.forwardPropagate(input);
 
-		const auto ones = NeuralNetwork::Matrix::Ones(NROWS, NCOLS);
-		static auto cwiseLog = [](double x) noexcept {return std::log(x); };
+		if (!outputApprox.allFinite()) {
+			std::cout << "Error: forward prop returned Inf values.\n";
+		}
+			
+		if (outputApprox.hasNaN()) {
+			std::cout << "Error: forward prop returned NaN values.\n";
+		}
+		if (outputApprox.maxCoeff() > 1) {
+			std::cout << "Error: forward prop returned values above 1.\n";
+		}
+		if (outputApprox.minCoeff() == 0) {
+			std::cout << "Error: forward prop returned a value that was zero.\n";
+		}	
+		if(outputApprox.minCoeff() < 0) {
+			std::cout << "Error: forward prop returned negative values.\n";
+		}
 
-		Eigen::MatrixXd temp = output.cwiseProduct(outputApprox.unaryExpr(cwiseLog));
-		temp += (ones - output).cwiseProduct((ones - outputApprox).unaryExpr(cwiseLog));
+		static auto cwiseLog = [](double x) noexcept {return isinf(std::log(x)) ? -1e-20 : std::log(x); };
 
-		costLog = -temp.sum() / NCOLS;
+		// Create a filter with the output values that are zero
+
+		auto temp = output.cwiseProduct(outputApprox.unaryExpr(cwiseLog))
+					 + (1 - output.array()).matrix().cwiseProduct((1-outputApprox.array()).matrix().unaryExpr(cwiseLog));
+
+		if (!temp.allFinite()) {
+			std::cout << "Error: temp contains Inf values.\n";
+		}
+
+		costLog = -temp.rowwise().mean().sum();
 	}
 	
 	// Cost attributed to regularization of weight matrices
 	// This helps counter-act overfitting
 	double costReg = 0; 
 	for (const auto& w : network.weights_) {
-		costReg += w.cwiseAbs2().sum();
+		costReg += w.cwiseAbs2().sum() * lambda_ / (2 * NCOLS);
 	}
-	costReg *= lambda_ / (2 * NCOLS);
 	
 	return costLog + costReg;
 }
@@ -55,11 +73,11 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 {
 	auto activations = forwardPropagateAll(network, input);
 
-	// Add bias unit to each layer activation except the last one
+	/*// Add bias unit to each layer activation except the last one
 	for (auto it = activations.begin(); it != activations.end() - 1; ++it) {
 		it->conservativeResize(it->rows() + 1, Eigen::NoChange);
 		it->row(it->rows() - 1).setOnes();
-	}
+	}*/
 
 	const auto sz = network.getWeights().size();
 
@@ -75,17 +93,15 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 		const auto& w = network.weights_[ri];
 
 		// Remove the bias unit portion of the error term. The end term has none
-		if (i > 0) {
-			delta.conservativeResize(delta.rows() - 1, Eigen::NoChange);
-		}
-
-		jacobian[ri] = delta * a.transpose() / NCOLS;
+		const int nrows = i > 0 ? delta.rows() - 1 : delta.rows();
+		
+		jacobian[ri] = delta.block(0, 0, nrows, NCOLS) * a.transpose() / NCOLS;
 		jacobian[ri].block(0, 0, w.rows(), w.cols() - 1) += lambda_ * w.block(0, 0, w.rows(), w.cols() - 1);
 
 		// Calculate the error term for the next layer
-		delta = w.transpose() * delta; 
-		delta = delta.cwiseProduct(a);
-		delta = delta.cwiseProduct(Eigen::MatrixXd::Ones(a.rows(), a.cols()) - a);
+		if (i < sz - 1) {
+			delta = (w.transpose() * delta.block(0, 0, nrows, NCOLS)).cwiseProduct(a).cwiseProduct((a.array() - 1).matrix());
+		}
 	}
 
 	return jacobian;
@@ -94,21 +110,36 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::forwardPropagateAll(const NeuralNetwork& network,
 	const Eigen::MatrixXd& input)
 {
-	static auto sigmoidFunction = [](double x) noexcept {return 1 / (1 + std::exp(-x)); };
+	static auto sigmoidFunc = [](double x) noexcept {return 1 / (1 + std::exp(-x)); };
+	const int NCOLS = input.cols();
 
-	// The unit activation of the input layer is just the input
-	std::vector<Eigen::MatrixXd> activations{ input };
+	Eigen::MatrixXd::Index nrowsMax = input.rows();
 	for (const auto& w : network.weights_) {
-		auto a = activations.back();
+		if (w.rows() > nrowsMax) {
+			nrowsMax = w.rows();
+		}
+	}
 
-		// Add bias unit to the activation
-		a.conservativeResize(a.rows() + 1, Eigen::NoChange);
-		a.row(a.rows() - 1).setOnes();
+	int nrows = input.rows();
 
-		// Calculate the unit activation in the next layer
-		a = (w*a).unaryExpr(sigmoidFunction);
+	Eigen::MatrixXd activation(nrowsMax + 1, NCOLS);
+	activation.block(0, 0, nrows, NCOLS) = input;
+	activation.block(nrows, 0, 1, NCOLS).setOnes();
 
-		activations.push_back(std::move(a));
+	std::vector<Eigen::MatrixXd> activations{ activation.block(0, 0, nrows + 1, NCOLS) };
+	for (auto it = network.weights_.begin(); it != network.weights_.end(); ++it) {
+		const auto& w = *it;
+		activation.block(0, 0, w.rows(), NCOLS) = (w*activation.block(0, 0, nrows + 1, NCOLS)).unaryExpr(sigmoidFunc);
+		
+		nrows = w.rows();
+
+		if (it != network.weights_.end() - 1) {
+			activation.block(nrows, 0, 1, NCOLS).setOnes();
+			activations.push_back(activation.block(0, 0, nrows + 1, NCOLS));
+		}
+		else {
+			activations.push_back(activation.block(0, 0, nrows, NCOLS));
+		}
 	}
 
 	return activations;
@@ -119,12 +150,15 @@ std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& netw
 {
 	int i = 0;
 	double prevCost = costFunction(network, input, output);
-	std::cout << prevCost << std::endl;
 	double costDiff = 2 * tol_; // Initial value to ensure tol_ < stepSize for the first iteration
 	for (; tol_ < costDiff && i < maxIter_; ++i) {
+		std::cout << "Grad desc step " << i << " Curr cost: " << prevCost << std::endl;
 
 		{
 			const auto jacobian = backwardPropagate(network, input, output);
+			if (jacobian.size() != network.weights_.size()) {
+				std::cout << "Error: Jacobian does not agree with weight matrices.\n";
+			}
 			auto ita = network.weights_.begin();
 			auto itb = jacobian.begin();
 			while (ita != network.weights_.end() && itb != jacobian.end()) {
@@ -135,28 +169,32 @@ std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& netw
 		}
 
 		double cost = costFunction(network, input, output);
-		costDiff = std::abs(cost - prevCost);
+		costDiff = prevCost - cost;
 		prevCost = cost;
+
+		if (costDiff < 0) {
+			std::cout << "The cost increased. Stopping gradient descent.\n";
+			++i;
+			break;
+		}
 	}
 
 	return { i, costDiff };
 }
 
-void NeuralNetworkTrainer::normalizeFeatures(Eigen::MatrixXd& features)
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> NeuralNetworkTrainer::normalizeFeatures(Eigen::MatrixXd& features)
 {
 	const auto NCOLS = features.cols();
 	assert(NCOLS > 1 && "Cannot calculate standard deviation of one element vectors");
 
-	for (int i = 0; i < features.rows(); ++i) {
-		const double mean = features.row(i).sum() / NCOLS;
-		const Eigen::RowVectorXd meanVec = mean * Eigen::RowVectorXd::Ones(NCOLS);
+	auto ONES = Eigen::RowVectorXd::Ones(NCOLS);
 
-		double stdDev = (features.row(i) - meanVec).norm() / std::sqrt((NCOLS - 1));
-		
-		if (stdDev == 0) {
-			stdDev = 1;
-		}
+	auto meanMat = features.rowwise().mean() * ONES;
+	auto stdDevMat = (((features - meanMat) / std::sqrt(NCOLS - 1)).rowwise().norm() * ONES);
+	// Think about how this affects later normalized forward propagation using new input data
+	auto stdDevMatCorrected = stdDevMat.unaryExpr([](double v) { return std::abs(v) > 0 ? v : 1; });
 
-		features.row(i) = (features.row(i) - meanVec) / stdDev;
-	}
+	features = (features - meanMat).cwiseQuotient(stdDevMatCorrected);
+
+	return { meanMat, stdDevMatCorrected };
 }

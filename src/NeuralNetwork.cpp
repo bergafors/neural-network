@@ -27,9 +27,29 @@ NeuralNetwork::NeuralNetwork(const std::vector<Matrix>& weights)
 
 NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input) const
 {
-	static auto sigmoidFunction = [](double x) noexcept {return 1 / (1 + std::exp(-x)); };
+	static auto sigmoidFunc = [](double x) noexcept {return 1 / (1 + std::exp(-x)); };
 
-	// The unit activation of the input layer is just the input
+	const int NCOLS = input.cols();
+
+	Eigen::MatrixXd::Index nrowsMax = input.rows();
+	for (const auto& w : weights_) {
+		if (w.rows() > nrowsMax) {
+			nrowsMax = w.rows();
+		}
+	}
+
+	Eigen::MatrixXd activation(nrowsMax + 1, NCOLS);
+	activation.block(0, 0, input.rows(), NCOLS) = input;
+
+	int nrows = input.rows();
+	for (const auto& w : weights_) {
+		activation.block(nrows, 0, 1, NCOLS).setOnes();
+
+		activation.block(0, 0, w.rows(), NCOLS) = (w*activation.block(0, 0, nrows + 1, NCOLS)).unaryExpr(sigmoidFunc);
+		nrows = w.rows();
+	}
+
+	/*// The unit activation of the input layer is just the input
 	auto activation = input;
 	for (const auto& m : weights_) {
 		// Add bias unit to the activation
@@ -37,10 +57,10 @@ NeuralNetwork::Matrix NeuralNetwork::forwardPropagate(const Matrix& input) const
 		activation.row(activation.rows() - 1).setOnes();
 
 		// Calculate the unit activation in the next layer
-		activation = (m*activation).unaryExpr(sigmoidFunction);
-	}
+		activation = 
+	}*/
 
-	return activation;
+	return activation.block(0, 0, nrows, NCOLS);
 }
 
 std::vector<NeuralNetwork::Matrix>& NeuralNetwork::getWeights() noexcept

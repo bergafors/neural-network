@@ -267,26 +267,6 @@ TEST_CASE("Gradient descent II")
 	REQUIRE(nnt.costFunction(nn, input, output) < TOL*10);
 }
 
-/* TEST_CASE("Train neural network")
-{
-	// Train neural network and 
-	NeuralNetwork::Matrix w1(2, 3);
-	NeuralNetwork::Matrix w2(1, 3);
-	NeuralNetwork nn({ w1, w2});
-
-	NeuralNetwork::Matrix input(2, 4);
-	NeuralNetwork::Matrix output(1, 4);
-	input << 0, 0, 1, 1, 0, 1, 0, 1;
-	output << 1, 0, 0, 1;
-
-	NeuralNetworkTrainer nnt(0, 1e-2, TOL/10, 1000);
-
-	auto p = nnt.trainNeuralNetwork(nn, input, output);
-	std::cout << p.first << " " << p.second << std::endl;
-
-	std::cout << nn.forwardPropagate(input);
-} */
-
 TEST_CASE("Normalize features")
 {
 	Eigen::MatrixXd someMat(10, 8);
