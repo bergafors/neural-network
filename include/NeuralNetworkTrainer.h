@@ -35,9 +35,13 @@ public:
 	std::vector<Eigen::MatrixXd> forwardPropagateAll(const NeuralNetwork& network,
 		const Eigen::MatrixXd& input);
 
+	// Perform gradient descent on %network and return the final
+	// number of steps taken, and the final reduction of the cost function.
 	std::pair<int, double> gradientDescent(NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
 
+	// Normalize each row and return the matrices containing the mean and standard deviation,
+	// respectively, of the initial values of each row.
 	std::pair<Eigen::MatrixXd, Eigen::MatrixXd> normalizeFeatures(Eigen::MatrixXd& features);
 
 };
