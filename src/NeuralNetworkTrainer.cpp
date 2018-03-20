@@ -73,12 +73,6 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 {
 	auto activations = forwardPropagateAll(network, input);
 
-	/*// Add bias unit to each layer activation except the last one
-	for (auto it = activations.begin(); it != activations.end() - 1; ++it) {
-		it->conservativeResize(it->rows() + 1, Eigen::NoChange);
-		it->row(it->rows() - 1).setOnes();
-	}*/
-
 	const auto sz = network.getWeights().size();
 
 	// Jacobian of the cost function w.r.t each weight matrix
