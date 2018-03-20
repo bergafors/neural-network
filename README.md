@@ -4,4 +4,4 @@ An implementation of a feedforward neural network. [Eigen](http://eigen.tuxfamil
 
 The network can now overfit training data correctly. However, the implementation is currently too slow to train networks on large training sets. The next goal is to add dynamic step size updating in gradient descent to improve training speed, and to optimize matrix computations where possible.
 
-The example in /examples uses data from the MNIST data base of hand-written digits, which can be found [here](http://yann.lecun.com/exdb/mnist/).
+The example in /examples uses data from the MNIST data base of handwritten digits, which can be found [here](http://yann.lecun.com/exdb/mnist/).
