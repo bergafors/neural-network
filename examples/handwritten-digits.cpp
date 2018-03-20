@@ -71,6 +71,22 @@ int main()
 		std::cout << "Num " << i << ": " << testOutput.row(i).mean() << std::endl;
 	}*/
 
+	/*for (int k = 0; k < 5; ++k) {
+		Eigen::MatrixXd::Index ind = 0;
+		trainOutput.col(k).maxCoeff(&ind);
+		std::cout << "Label: " << ind << std::endl;
+
+		for (int i = 0; i < 28; ++i) {
+			for (int j = 0; j < 28; ++j) {
+				int val = trainInput(i * 28 + j, k);
+				std::cout << (val > 0 ? 1 : 0) << ' ';
+			}
+			std::cout << std::endl;
+		}
+		std::cout << std::endl;
+	}*/
+	
+
 	NeuralNetwork nn({28*28, 100, 10});
 	for (auto& w : nn.getWeights()) {
 		1e-2*w.setRandom();
