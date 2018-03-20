@@ -13,8 +13,6 @@ struct NeuralNetworkTrainer
 	double tol_ = 0;
 	int maxIter_ = 0;
 
-	// The commented functions below are to be implemented.
-
 public:
 	NeuralNetworkTrainer() = default;
 	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept;
