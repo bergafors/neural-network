@@ -44,9 +44,11 @@ double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
 			std::cout << "Error: forward prop returned negative values.\n";
 		}
 
+		// As log may return -inf if x is sufficiently small, we add a lower bound to the log function.
+		// This introduces a small error in the cost function when the corresponding element in output
+		// (or 1 - output for 1 - outputApprox) is non-zero. These cases should grow increasingly rare
+		// with decreasing cost, however.
 		static auto cwiseLog = [](double x) noexcept {return isinf(std::log(x)) ? -1e-20 : std::log(x); };
-
-		// Create a filter with the output values that are zero
 
 		auto temp = output.cwiseProduct(outputApprox.unaryExpr(cwiseLog))
 					 + (1 - output.array()).matrix().cwiseProduct((1-outputApprox.array()).matrix().unaryExpr(cwiseLog));
