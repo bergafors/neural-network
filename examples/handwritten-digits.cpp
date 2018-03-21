@@ -20,8 +20,8 @@ double calculateAccuracy(const NeuralNetwork& nn, const Eigen::MatrixXd& input,
 
 int main()
 {
-	const std::int32_t maxTrainItems = 10;
-	const std::int32_t maxTestItems = 10;
+	const std::int32_t maxTrainItems = 100;
+	const std::int32_t maxTestItems = 20;
 
 	Eigen::MatrixXd trainInput, trainOutput, testInput, testOutput;
 
@@ -92,10 +92,10 @@ int main()
 		1e-2*w.setRandom();
 	}
 
-	NeuralNetworkTrainer nnt(0, 1e-2, 1e-5, 1600);
+	NeuralNetworkTrainer nnt(0, 1e-2, 1e-5, 20);
 
 	std::cout << "Normalizing training and test input features...\n";
-	/*const auto normMat = nnt.normalizeFeatures(trainInput);
+	const auto normMat = nnt.normalizeFeatures(trainInput);
 	std::cout << "Normalization complete.\n";
 	if (trainInput.hasNaN()) {
 		std::cout << "Error: normalized training input contains NaN values\n";
@@ -104,13 +104,17 @@ int main()
 		std::cout << "Error: normalized training input contains Inf values\n";
 	}
 
-	Eigen::MatrixXd normTestInput = (testInput - normMat.first).cwiseQuotient(normMat.second);
+	const auto& meanMat = normMat.first;
+	const auto& invStdDevMat = normMat.second;
+	const auto nr = testInput.rows();
+	const auto nc = testInput.cols();
+	auto normTestInput = (testInput - meanMat.block(0, 0, nr, nc)).cwiseProduct(invStdDevMat.block(0, 0, nr, nc));
 	if (normTestInput.hasNaN()) {
 		std::cout << "Error: normalized test input contains NaN values\n";
 	}
 	if (!normTestInput.allFinite()) {
 		std::cout << "Error: normalized test input contains Inf values\n";
-	}*/
+	}
 
 	std::cout << "Training neural network...\n";
 	const auto p = nnt.trainNeuralNetwork(nn, trainInput, trainOutput);

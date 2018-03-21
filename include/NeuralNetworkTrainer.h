@@ -39,7 +39,7 @@ public:
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
 
 	// Normalize each row of %features and return matrices containing the mean
-	// and standard deviation, respectively, of the initial values of each row.
+	// and the inverse standard deviation, respectively, of the initial values of each row.
 	std::pair<Eigen::MatrixXd, Eigen::MatrixXd> normalizeFeatures(Eigen::MatrixXd& features);
 
 };

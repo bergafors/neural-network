@@ -73,31 +73,47 @@ double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
 std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const NeuralNetwork& network,
 	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output)
 {
-	auto activations = forwardPropagateAll(network, input);
-
+	const auto NCOLS = input.cols(); // Number of training examples
 	const auto sz = network.getWeights().size();
 
 	// Jacobian of the cost function w.r.t each weight matrix
 	std::vector<Eigen::MatrixXd> jacobian(sz);
 
+	// Find the error term with the largest number of rows 
+	Eigen::MatrixXd::Index nrowsMax = input.rows();
+	for (const auto& w : network.weights_) {
+		if (w.rows() > nrowsMax) {
+			nrowsMax = w.rows();
+		}
+	}
+
+	Eigen::MatrixXd delta(nrowsMax + 1, NCOLS);
+
+	auto activations = forwardPropagateAll(network, input);
+
 	// Calculate the jacobian for each weight matrix, starting from the last.
-	const auto NCOLS = input.cols(); // Number of training examples
-	Eigen::MatrixXd delta = activations.back() - output; // End layer error term
+
+	Eigen::MatrixXd::Index nrows = activations.back().rows();
+	delta.block(0, 0, nrows, NCOLS) = activations.back() - output; // End layer error term
 	for (std::size_t i = 0; i < sz; ++i) {
 		const auto ri = sz - 1 - i;
 		const auto& a = activations[ri];
 		const auto& w = network.weights_[ri];
 
 		// Remove the bias unit portion of the error term. The end term has none
-		const int nrows = i > 0 ? delta.rows() - 1 : delta.rows();
+		const int rm = i > 0 ? 1 : 0;
 		
-		jacobian[ri] = delta.block(0, 0, nrows, NCOLS) * a.transpose() / NCOLS;
+		jacobian[ri] = delta.block(0, 0, nrows - rm, NCOLS) * a.transpose() / NCOLS;
 		jacobian[ri].block(0, 0, w.rows(), w.cols() - 1) += lambda_ * w.block(0, 0, w.rows(), w.cols() - 1);
 
 		// Calculate the error term for the next layer
 		if (i < sz - 1) {
-			delta = (w.transpose() * delta.block(0, 0, nrows, NCOLS)).cwiseProduct(a).cwiseProduct((a.array() - 1).matrix());
+			delta.block(0, 0, a.rows(), NCOLS) = (w.transpose() * delta.block(0, 0, nrows - rm, NCOLS)) \
+				.cwiseProduct(a).cwiseProduct((a.array() - 1).matrix());
 		}
+
+		// Number of rows of the next error term
+		nrows = a.rows();
 	}
 
 	return jacobian;
@@ -183,14 +199,14 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> NeuralNetworkTrainer::normalizeFeatu
 	const auto NCOLS = features.cols();
 	assert(NCOLS > 1 && "Cannot calculate standard deviation of one element vectors");
 
-	auto ONES = Eigen::RowVectorXd::Ones(NCOLS);
+	const auto ones = Eigen::RowVectorXd::Ones(NCOLS);
 
-	auto meanMat = features.rowwise().mean() * ONES;
-	auto stdDevMat = (((features - meanMat) / std::sqrt(NCOLS - 1)).rowwise().norm() * ONES);
-	// Think about how this affects later normalized forward propagation using new input data
-	auto stdDevMatCorrected = stdDevMat.unaryExpr([](double v) { return std::abs(v) > 0 ? v : 1; });
+	const auto meanMat = features.rowwise().mean() * ones;
 
-	features = (features - meanMat).cwiseQuotient(stdDevMatCorrected);
+	const auto stdDevMat = ((features - meanMat) / std::sqrt(NCOLS - 1)).rowwise().norm() * ones;
+	const auto invStdDevMat = stdDevMat.unaryExpr([](double v) { return std::abs(v) > 0 ? 1/v : 1; });
 
-	return { meanMat, stdDevMatCorrected };
+	features = (features - meanMat).cwiseProduct(invStdDevMat);
+
+	return { meanMat, invStdDevMat };
 }
