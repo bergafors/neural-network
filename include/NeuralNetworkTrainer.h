@@ -1,25 +1,39 @@
 #pragma once
 
 #include "NeuralNetwork.h"
-
 #include <Eigen/Dense>
-
 #include <vector>
 
 struct NeuralNetworkTrainer
 {
+	// Set gradient descent type
+	// BATCH: regular batch gradient descent
+	// MINIBATCH: stochastic gradient descent with mini-batch size 10
+	enum class GradientDescentType { BATCH, MINIBATCH};
+
 	double lambda_ = 0;
 	double alpha_ = 0;
 	double tol_ = 0;
 	int maxIter_ = 0;
+	GradientDescentType gdt_ = GradientDescentType::BATCH;
 
 public:
 	NeuralNetworkTrainer() = default;
-	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept;
+	NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter, 
+		GradientDescentType gdt = GradientDescentType::BATCH) noexcept;
 	
 public:
-	 std::pair<int, double> trainNeuralNetwork(NeuralNetwork& network, 
-		Eigen::MatrixXd input, Eigen::MatrixXd output);
+	// Train %network on given %input and %output training data.
+	// Optionally provide test data to track the test cost.
+	// Uses batch or mini-batch gradient descent as specified by
+	// %gdt_.
+	// Returns the number of iterations performed, as well
+	// as the final training cost function difference when
+	// using batch gradient descent.
+	std::pair<int, double> trainNetwork(NeuralNetwork& network,
+		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output,
+		const Eigen::MatrixXd& testInput = Eigen::MatrixXd{}, 
+		const Eigen::MatrixXd& testOutput = Eigen::MatrixXd{});
 
 	double costFunction(const NeuralNetwork& network, 
 		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output) const;
@@ -33,13 +47,24 @@ public:
 	std::vector<Eigen::MatrixXd> forwardPropagateAll(const NeuralNetwork& network,
 		const Eigen::MatrixXd& input);
 
-	// Perform gradient descent on %network and return the final
+	// Perform batch gradient descent on %network and return the final
 	// number of steps taken, and the final reduction of the cost function.
 	std::pair<int, double> gradientDescent(NeuralNetwork& network, 
-		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
+		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output,
+		const Eigen::MatrixXd& testInput, const Eigen::MatrixXd& testOutput);
 
-	// Normalize each row of %features and return matrices containing the mean
-	// and the inverse standard deviation, respectively, of the initial values of each row.
-	std::pair<Eigen::MatrixXd, Eigen::MatrixXd> normalizeFeatures(Eigen::MatrixXd& features);
+	// Perform mini-batch gradient descent on %network
+	std::pair<int, double> stochasticGradientDescent(NeuralNetwork& network,
+		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output,
+		const Eigen::MatrixXd& testInput, const Eigen::MatrixXd& testOutput);
+
+	// Normalize %features over each row
+	void normalizeFeatures(Eigen::MatrixXd& features);
+
+	// Calculate how many examples in &output that &network correctly
+	// predicts given %input. Return the number of accurately
+	// predicted examples.
+	Eigen::MatrixXd::Index predict(const NeuralNetwork& network, 
+		const Eigen::MatrixXd& input, const Eigen::MatrixXd& output);
 
 };

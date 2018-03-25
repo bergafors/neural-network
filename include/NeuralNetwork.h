@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Eigen/Dense>
-
 #include <vector>
 
 class NeuralNetwork
@@ -9,23 +8,26 @@ class NeuralNetwork
 public:
 	friend struct NeuralNetworkTrainer;
 
-	using Matrix = Eigen::MatrixXd;
-	using SizeType = Matrix::Index;
-
 public:
 	NeuralNetwork() = delete;
-	NeuralNetwork(const std::vector<SizeType>& layers);
-	NeuralNetwork(const std::vector<Matrix>& weights);
+	// Create a neural network with layer structure given by %layers.
+	// Note that the values in %layers should not include the bias unit.
+	// Requirement: layers.size() >= 2.
+	NeuralNetwork(const std::vector<Eigen::MatrixXd::Index>& layers);
+	// Create a neural network with layer structure given by %weights,
+	// the corresponding weight matrices.
+	NeuralNetwork(const std::vector<Eigen::MatrixXd>& weights);
 
 
 public:
-	Matrix forwardPropagate(const Matrix& input) const;
+	// Return the output layer activation for a given %input
+	Eigen::MatrixXd forwardPropagate(const Eigen::MatrixXd& input) const;
 
-	std::vector<Matrix>& getWeights() noexcept;
-	const std::vector<Matrix>& getWeights() const noexcept;
-	const std::vector<SizeType>& getLayers() const noexcept;
+	std::vector<Eigen::MatrixXd>& getWeights() noexcept;
+	const std::vector<Eigen::MatrixXd>& getWeights() const noexcept;
+	const std::vector<Eigen::MatrixXd::Index>& getLayers() const noexcept;
 
 private:
-	std::vector<Matrix> weights_;
-	std::vector<SizeType> layers_;
+	std::vector<Eigen::MatrixXd> weights_;
+	std::vector<Eigen::MatrixXd::Index> layers_;
 };

@@ -10,18 +10,33 @@
 #include <vector>
 
 #include <cmath>
+#include <ctime>
 #include <intrin.h>
 
 enum class DataType {Images, Labels};
 
 Eigen::MatrixXd readData(std::ifstream& file, const DataType dt, const std::int32_t maxItems = -1);
-double calculateAccuracy(const NeuralNetwork& nn, const Eigen::MatrixXd& input,
-	const Eigen::MatrixXd& correctOutput);
 
 int main()
 {
-	const std::int32_t maxTrainItems = 100;
-	const std::int32_t maxTestItems = 20;
+	// Create a trainer with regularization parameter lambda_ = 0.01;
+	// training rate alpha_ = 0.03; cost function difference tolerance tol_ = 1e-3;
+	// and maximum number of iterations maxIter_ = 10. The trainer will use mini-batch
+	// gradient descent.
+	NeuralNetworkTrainer nnt(0.01, 0.03, 1e-6, 10, NeuralNetworkTrainer::GradientDescentType::MINIBATCH);
+	NeuralNetwork nn({ 28 * 28, 30, 10 });
+
+	// Initialize weights randomly using Xavier-inititalization
+	std::srand((unsigned int)time(0));
+	for (auto& w : nn.getWeights()) {
+		w.setRandom();
+		const double eInit = std::sqrt(2.0 / (w.cols() + w.rows()));
+		w *= eInit;
+	}
+
+	// Going above 40000 may cause issues on 32-bit systems
+	const std::int32_t maxTrainItems = 40000;
+	const std::int32_t maxTestItems = 10000;
 
 	Eigen::MatrixXd trainInput, trainOutput, testInput, testOutput;
 
@@ -32,15 +47,6 @@ int main()
 		}
 		trainInput = readData(file, DataType::Images, maxTrainItems);
 		std::cout << '\r' << "Training input data read.\n";
-	}
-	
-	{
-		std::ifstream file("../testdata/train-labels.idx1-ubyte", std::ios::binary);
-		if (!file) {
-			std::cout << "Couldnt open data file";
-		}
-		trainOutput = readData(file, DataType::Labels, maxTrainItems);
-		std::cout << '\r' << "Training output data read.\n";
 	}
 
 	{
@@ -53,6 +59,15 @@ int main()
 	}
 
 	{
+		std::ifstream file("../testdata/train-labels.idx1-ubyte", std::ios::binary);
+		if (!file) {
+			std::cout << "Couldnt open data file";
+		}
+		trainOutput = readData(file, DataType::Labels, maxTrainItems);
+		std::cout << '\r' << "Training output data read.\n";
+	}
+
+	{
 		std::ifstream file("../testdata/t10k-labels.idx1-ubyte", std::ios::binary);
 		if (!file) {
 			std::cout << "Couldnt open data file";
@@ -61,42 +76,11 @@ int main()
 		std::cout << '\r' << "Test output data read.\n";
 	}
 
-	/*std::cout << "Training output:\n";
-	for (int i = 0; i < trainOutput.rows(); ++i) {
-		std::cout << "Num " << i << ": " << trainOutput.row(i).mean() << std::endl;;
-	}
-
-	std::cout << "Test output:\n";
-	for (int i = 0; i < testOutput.rows(); ++i) {
-		std::cout << "Num " << i << ": " << testOutput.row(i).mean() << std::endl;
-	}*/
-
-	/*for (int k = 0; k < 5; ++k) {
-		Eigen::MatrixXd::Index ind = 0;
-		trainOutput.col(k).maxCoeff(&ind);
-		std::cout << "Label: " << ind << std::endl;
-
-		for (int i = 0; i < 28; ++i) {
-			for (int j = 0; j < 28; ++j) {
-				int val = trainInput(i * 28 + j, k);
-				std::cout << (val > 0 ? 1 : 0) << ' ';
-			}
-			std::cout << std::endl;
-		}
-		std::cout << std::endl;
-	}*/
-	
-
-	NeuralNetwork nn({28*28, 100, 10});
-	for (auto& w : nn.getWeights()) {
-		1e-2*w.setRandom();
-	}
-
-	NeuralNetworkTrainer nnt(0, 1e-2, 1e-5, 20);
-
 	std::cout << "Normalizing training and test input features...\n";
-	const auto normMat = nnt.normalizeFeatures(trainInput);
+	nnt.normalizeFeatures(trainInput);
+	nnt.normalizeFeatures(testInput);
 	std::cout << "Normalization complete.\n";
+
 	if (trainInput.hasNaN()) {
 		std::cout << "Error: normalized training input contains NaN values\n";
 	}
@@ -104,50 +88,24 @@ int main()
 		std::cout << "Error: normalized training input contains Inf values\n";
 	}
 
-	const auto& meanMat = normMat.first;
-	const auto& invStdDevMat = normMat.second;
-	const auto nr = testInput.rows();
-	const auto nc = testInput.cols();
-	auto normTestInput = (testInput - meanMat.block(0, 0, nr, nc)).cwiseProduct(invStdDevMat.block(0, 0, nr, nc));
-	if (normTestInput.hasNaN()) {
+	if (testInput.hasNaN()) {
 		std::cout << "Error: normalized test input contains NaN values\n";
 	}
-	if (!normTestInput.allFinite()) {
+	if (!testInput.allFinite()) {
 		std::cout << "Error: normalized test input contains Inf values\n";
 	}
 
 	std::cout << "Training neural network...\n";
-	const auto p = nnt.trainNeuralNetwork(nn, trainInput, trainOutput);
+	nnt.trainNetwork(nn, trainInput, trainOutput, testInput, testOutput);
 	std::cout << "Training complete.\n";
-	std::cout << "Steps taken: " << p.first << '\n';
-	std::cout << "Final cost function difference: " << p.second << '\n';
 
 	std::cout << "Calculating accuracy...\n";
-	double accuracy = calculateAccuracy(nn, trainInput, trainOutput);
+	double accuracy = nnt.predict(nn, testInput, testOutput);
+	accuracy /= testInput.cols();
 
 	std::cout << "The neural network correctly identified " << 100*accuracy << "% of the hand-written digits.\n";
 
 	return 0;
-}
-
-double calculateAccuracy(const NeuralNetwork& nn, const Eigen::MatrixXd& input,
-	const Eigen::MatrixXd& correctOutput)
-{
-	const Eigen::MatrixXd output = nn.forwardPropagate(input);
-
-	double accuracy = 0;
-	Eigen::MatrixXd::Index indexOfMax = 0;
-	Eigen::MatrixXd::Index correctIndexOfMax = 0;
-	for (int i = 0; i < output.cols(); ++i) {
-		output.col(i).maxCoeff(&indexOfMax);
-		correctOutput.col(i).maxCoeff(&correctIndexOfMax);
-
-		if (indexOfMax == correctIndexOfMax) {
-			++accuracy;
-		}
-	}
-
-	return accuracy / output.cols();
 }
 
 Eigen::MatrixXd readData(std::ifstream& file, const DataType dt, const std::int32_t maxItems)
@@ -159,7 +117,7 @@ Eigen::MatrixXd readData(std::ifstream& file, const DataType dt, const std::int3
 
 		std::int32_t magicNum = 0;
 		file.read((char*)&magicNum, sizeof(magicNum));
-		// Read as big-endian. Intel processors use little-endian
+		// Stored in big-endian format. Intel processors use little-endian
 		magicNum = _byteswap_ulong(magicNum); 
 
 		std::int32_t nitems = 0;

@@ -1,19 +1,30 @@
 #include "NeuralNetworkTrainer.h"
 
 #include <algorithm>
+#include <numeric>
 #include <iostream>
 #include <cassert>
 #include <limits>
 
-NeuralNetworkTrainer::NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter) noexcept
-	: lambda_(lambda), alpha_(alpha), tol_(tol), maxIter_(maxIter)
+NeuralNetworkTrainer::NeuralNetworkTrainer(double lambda, double alpha, double tol, int maxIter,
+	NeuralNetworkTrainer::GradientDescentType gdt) noexcept
+	: lambda_(lambda), alpha_(alpha), tol_(tol), maxIter_(maxIter), gdt_(gdt)
 {
 }
 
-std::pair<int, double> NeuralNetworkTrainer::trainNeuralNetwork(NeuralNetwork& network,
-	Eigen::MatrixXd input, Eigen::MatrixXd output)
+std::pair<int, double> NeuralNetworkTrainer::trainNetwork(NeuralNetwork& network,
+	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output,
+	const Eigen::MatrixXd& testInput, const Eigen::MatrixXd& testOutput)
 {
-	return gradientDescent(network, input, output);
+	std::pair<int, double> gdInfo;
+	if (gdt_ == NeuralNetworkTrainer::GradientDescentType::BATCH) {
+		gdInfo = gradientDescent(network, input, output, testInput, testOutput);
+	}
+	else if (gdt_ == NeuralNetworkTrainer::GradientDescentType::MINIBATCH) {
+		gdInfo = stochasticGradientDescent(network, input, output, testInput, testOutput);
+	} 
+
+	return gdInfo;
 }
 
 double NeuralNetworkTrainer::costFunction(const NeuralNetwork& network,
@@ -101,15 +112,17 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::backwardPropagate(const Neura
 		const auto& w = network.weights_[ri];
 
 		// Remove the bias unit portion of the error term. The end term has none
-		const int rm = i > 0 ? 1 : 0;
+		const Eigen::MatrixXd::Index rm = i > 0 ? 1 : 0;
 		
-		jacobian[ri] = delta.block(0, 0, nrows - rm, NCOLS) * a.transpose() / NCOLS;
+		jacobian[ri] = delta.block(0, 0, nrows - rm, NCOLS) * a.transpose();
 		jacobian[ri].block(0, 0, w.rows(), w.cols() - 1) += lambda_ * w.block(0, 0, w.rows(), w.cols() - 1);
+		jacobian[ri] /= static_cast<double>(NCOLS);
 
-		// Calculate the error term for the next layer
+		// Calculate the error term for the next layer, unless at the last iteration
+		static auto sigmoidPrime = [](double x) noexcept {return x * (1 - x); };
 		if (i < sz - 1) {
 			delta.block(0, 0, a.rows(), NCOLS) = (w.transpose() * delta.block(0, 0, nrows - rm, NCOLS)) \
-				.cwiseProduct(a).cwiseProduct((a.array() - 1).matrix());
+				.cwiseProduct(a.unaryExpr(sigmoidPrime));
 		}
 
 		// Number of rows of the next error term
@@ -123,18 +136,17 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::forwardPropagateAll(const Neu
 	const Eigen::MatrixXd& input)
 {
 	static auto sigmoidFunc = [](double x) noexcept {return 1 / (1 + std::exp(-x)); };
-	const int NCOLS = input.cols();
+	const auto NCOLS = input.cols();
 
-	Eigen::MatrixXd::Index nrowsMax = input.rows();
+	auto nrowsMax = input.rows();
 	for (const auto& w : network.weights_) {
 		if (w.rows() > nrowsMax) {
 			nrowsMax = w.rows();
 		}
 	}
-
-	int nrows = input.rows();
-
 	Eigen::MatrixXd activation(nrowsMax + 1, NCOLS);
+
+	auto nrows = input.rows();
 	activation.block(0, 0, nrows, NCOLS) = input;
 	activation.block(nrows, 0, 1, NCOLS).setOnes();
 
@@ -158,13 +170,25 @@ std::vector<Eigen::MatrixXd> NeuralNetworkTrainer::forwardPropagateAll(const Neu
 }
 
 std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& network,
-	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output)
+	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output,
+	const Eigen::MatrixXd& testInput, const Eigen::MatrixXd& testOutput)
 {
+	double alpha = alpha_;
+
 	int i = 0;
 	double prevCost = costFunction(network, input, output);
 	double costDiff = 2 * tol_; // Initial value to ensure tol_ < stepSize for the first iteration
 	for (; tol_ < costDiff && i < maxIter_; ++i) {
-		std::cout << "Grad desc step " << i << " Curr cost: " << prevCost << std::endl;
+		double testCost = 0;
+		if (testInput.size() != 0 && testOutput.size() != 0) {
+			const auto testCost = costFunction(network, testInput, testOutput);
+		}
+
+		std::cout << "Epoch: " << i << " Training cost: " << prevCost;
+		if (testInput.size() != 0 && testOutput.size() != 0) {
+			std::cout << " Test cost: " << testCost;
+		}
+		std::cout << '\n';
 
 		{
 			const auto jacobian = backwardPropagate(network, input, output);
@@ -174,7 +198,7 @@ std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& netw
 			auto ita = network.weights_.begin();
 			auto itb = jacobian.begin();
 			while (ita != network.weights_.end() && itb != jacobian.end()) {
-				*ita = *ita - alpha_ * *itb;
+				*ita = *ita - alpha * *itb;
 				++ita;
 				++itb;
 			}
@@ -185,28 +209,102 @@ std::pair<int, double> NeuralNetworkTrainer::gradientDescent(NeuralNetwork& netw
 		prevCost = cost;
 
 		if (costDiff < 0) {
-			std::cout << "The cost increased. Stopping gradient descent.\n";
-			++i;
-			break;
+			alpha /= 3;
+			std::cout << "The cost increased. Decreasing alpha to " << alpha << '\n';
+			costDiff = 2 * tol_;
 		}
 	}
 
 	return { i, costDiff };
 }
 
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> NeuralNetworkTrainer::normalizeFeatures(Eigen::MatrixXd& features)
+std::pair<int, double> NeuralNetworkTrainer::stochasticGradientDescent(NeuralNetwork& network,
+	const Eigen::MatrixXd& input, const Eigen::MatrixXd& output, 
+	const Eigen::MatrixXd& testInput, const Eigen::MatrixXd& testOutput)
+{
+	const Eigen::MatrixXd::Index BATCHSIZE = 10;
+	const auto NEXAMPLES = input.cols();
+
+	std::vector<Eigen::MatrixXd::Index> vint(NEXAMPLES);
+	std::iota(vint.begin(), vint.end(), 0);
+	std::random_shuffle(vint.begin(), vint.end());
+
+	// Shuffle training data and put input and output data
+	// belonging to the same example closer together in memory.
+	// The latter will improve cache-friendliness while
+	// running back propagation on each mini-batch.
+	Eigen::MatrixXd batches(input.rows() + output.rows(), NEXAMPLES);
+	for (const auto& i : vint) {
+		batches.col(i) << input.col(i), output.col(i);
+	}
+
+	int i = 0;
+	for (; i < maxIter_; ++i) {
+		const auto cost = costFunction(network, input, output);
+		double testCost = 0;
+		if (testInput.size() != 0 && testOutput.size() != 0) {
+			testCost = costFunction(network, testInput, testOutput);
+		}
+
+		std::cout << "Epoch: " << i << " Training cost: " << cost;
+		if (testInput.size() != 0 && testOutput.size() != 0) {
+			std::cout << " Test cost: " << testCost;
+		}
+		std::cout << '\n';
+
+		for (int j = 0; j < NEXAMPLES / BATCHSIZE; ++j) {
+			Eigen::MatrixXd batchIn = batches.block(0, j*BATCHSIZE, 28 * 28, BATCHSIZE);
+			Eigen::MatrixXd batchOut = batches.block(28 * 28, j*BATCHSIZE, 10, BATCHSIZE);
+			const auto jacobian = backwardPropagate(network, batchIn, batchOut);
+
+			if (jacobian.size() != network.weights_.size()) {
+				std::cout << "Error: Jacobian does not agree with weight matrices.\n";
+			}
+
+			auto ita = network.weights_.begin();
+			auto itb = jacobian.begin();
+			while (ita != network.weights_.end() && itb != jacobian.end()) {
+				*ita = *ita - alpha_ * *itb;
+				++ita;
+				++itb;
+			}
+		}
+		
+	}
+
+	return { i, -1 };
+}
+
+void NeuralNetworkTrainer::normalizeFeatures(Eigen::MatrixXd& features)
 {
 	const auto NCOLS = features.cols();
 	assert(NCOLS > 1 && "Cannot calculate standard deviation of one element vectors");
 
 	const auto ones = Eigen::RowVectorXd::Ones(NCOLS);
 
-	const auto meanMat = features.rowwise().mean() * ones;
-
-	const auto stdDevMat = ((features - meanMat) / std::sqrt(NCOLS - 1)).rowwise().norm() * ones;
-	const auto invStdDevMat = stdDevMat.unaryExpr([](double v) { return std::abs(v) > 0 ? 1/v : 1; });
+	auto meanMat = features.rowwise().mean() * ones;
+	auto invStdDevMat = (((features - meanMat) / std::sqrt(NCOLS - 1)).rowwise().norm() * ones) \
+		.unaryExpr([](double v) { return std::abs(v) > 0 ? 1/v : 1; });
 
 	features = (features - meanMat).cwiseProduct(invStdDevMat);
+}
 
-	return { meanMat, invStdDevMat };
+Eigen::MatrixXd::Index NeuralNetworkTrainer::predict(const NeuralNetwork& network,
+	const Eigen::MatrixXd& input, const Eigen::MatrixXd& correctOutput)
+{
+	const auto output = network.forwardPropagate(input);
+
+	Eigen::MatrixXd::Index npredicted = 0;
+	Eigen::MatrixXd::Index indexOfMax = 0;
+	Eigen::MatrixXd::Index correctIndexOfMax = 0;
+	for (Eigen::MatrixXd::Index i = 0; i < output.cols(); ++i) {
+		output.col(i).maxCoeff(&indexOfMax);
+		correctOutput.col(i).maxCoeff(&correctIndexOfMax);
+
+		if (indexOfMax == correctIndexOfMax) {
+			++npredicted;
+		}
+	}
+
+	return npredicted;
 }
