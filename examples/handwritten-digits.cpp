@@ -1,3 +1,16 @@
+/*
+This example trains a neural network with one hidden layer to detect images of handwritten digits.
+The required training data can be found at http://yann.lecun.com/exdb/mnist/.
+
+The example should be compiled with -O2 and -mssd2. To use the whole training set (60000 examples)
+it is necessary to compile it on a 64-bit system.
+
+Note that the some entries in the training data uses the big-endian format. readData assumes
+that the system this is compiled against uses small-endian. It transforms the entries to
+small-endian using _byteswap_ulong from intrin.h, an MSVC-only library. 
+*/
+
+
 #pragma once
 
 #include "NeuralNetwork.h"
